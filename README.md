@@ -54,30 +54,38 @@ scale to the same as the measurement. For the 100 and 50 microsecond tests,
 I left the scale at 200 microseconds since it didn't matter.
 
 hrt-50ms-test.png came from
+
 	root@overo:~# echo 50000 > /dev/hrt
 
 hrt-5ms-test.png came from
+
 	root@overo:~# echo 5000 > /dev/hrt
 
 hrt-1ms-test.png came from
+
 	root@overo:~# echo 1000 > /dev/hrt
 
 hrt-500us-test.png came from
+
 	root@overo:~# echo 500 > /dev/hrt
 
 hrt-200us-test.png came from
+
 	root@overo:~# echo 200 > /dev/hrt
 
 hrt-100us-test.png came from
+
 	root@overo:~# echo 100 > /dev/hrt
 
 hrt-50us-test.png came from
+
 	root@overo:~# echo 50 > /dev/hrt
 
 
-I'd be happy to hear if I did something wrong. The motivation for this was a
-failed attempt to an hrtimer in a driver wanting accuracies in the 20 usecond
-range. That didn't work out.
+I'd be happy to hear if I did something wrong. 
+
+The motivation for this was a failed attempt to use an hrtimer in a driver 
+wanting accuracies in the 20 usecond range. That didn't work out.
 
 See the source code for more details.
 
