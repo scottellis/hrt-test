@@ -10,13 +10,13 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
-#include <mach/gpio.h>
+#include <linux/gpio.h>
 #include <linux/hrtimer.h>
 
-/* this is pin 19 on the TOBI/SUMMIT Gumstix expansion boards */
+// this is pin 19 on the TOBI/SUMMIT Gumstix expansion boards
 #define TOGGLE_PIN 170
 
-#define DEFAULT_INTERVAL_US 500
+#define USEC_TO_NSEC(x)	((x) * 1000)
 
 struct hrt_dev {
 	dev_t devt;
@@ -24,8 +24,7 @@ struct hrt_dev {
 	struct semaphore sem;
 	struct class *class;
 	struct hrtimer timer;
-	unsigned long usecs;
-	int irq;
+	ktime_t delay;
 	int val;
 	int count;
 };
@@ -36,8 +35,8 @@ static enum hrtimer_restart hrt_timer_callback(struct hrtimer *timer)
 {
 	hrt.count++;
 	
-	if (hrt.count > 9) {
-		/* leave at zero for next run */
+	if (hrt.count > 199) {
+		// leave at zero for next run
 		gpio_set_value(TOGGLE_PIN, 0);
 		return HRTIMER_NORESTART;
 	}
@@ -45,7 +44,7 @@ static enum hrtimer_restart hrt_timer_callback(struct hrtimer *timer)
 	hrt.val = !hrt.val;
 	gpio_set_value(TOGGLE_PIN, hrt.val);
 
-	hrtimer_forward_now(&hrt.timer, ktime_set(0, hrt.usecs * 1000));
+	hrtimer_forward_now(&hrt.timer, hrt.delay);
 
 	return HRTIMER_RESTART;
 }
@@ -56,7 +55,7 @@ static void do_toggle_test(void)
 	hrt.count = 0;
 	gpio_set_value(TOGGLE_PIN, 1);
 
-	hrtimer_start(&hrt.timer, ktime_set(0, hrt.usecs * 1000), HRTIMER_MODE_REL);
+	hrtimer_start(&hrt.timer, hrt.delay, HRTIMER_MODE_REL);
 }
 
 static ssize_t hrt_write(struct file *filp, const char __user *buff,
@@ -64,6 +63,7 @@ static ssize_t hrt_write(struct file *filp, const char __user *buff,
 {
 	char str[16];
 	ssize_t status;
+	unsigned long usecs;
 
 	if (count == 0)
 		return 0;
@@ -82,15 +82,16 @@ static ssize_t hrt_write(struct file *filp, const char __user *buff,
 		goto hrt_write_done;
 	}
 
-	hrt.usecs = simple_strtoul(str, NULL, 10);
+	usecs = simple_strtoul(str, NULL, 10);
 
-	if (hrt.usecs < 1 || hrt.usecs > 500000) {
-		printk(KERN_ALERT "invalid delay %lu\n", hrt.usecs);
+	if (usecs < 1 || usecs > 500000) {
+		printk(KERN_ALERT "invalid delay %lu\n", usecs);
 		status = -EINVAL;
-		hrt.usecs = DEFAULT_INTERVAL_US;
 		goto hrt_write_done;
 	}
-		
+	
+	hrt.delay = ktime_set(0, USEC_TO_NSEC(usecs));
+
 	do_toggle_test();	
 
 	status = count;
@@ -157,16 +158,14 @@ static int __init hrt_init_pins(void)
 {
 	if (gpio_request(TOGGLE_PIN, "togglepin")) {
 		printk(KERN_ALERT "gpio_request failed\n");
-		goto init_pins_fail_1;
+		return -1;
 	}
 
 	if (gpio_direction_output(TOGGLE_PIN, 0)) {
 		printk(KERN_ALERT "gpio_direction_output failed\n");
-		goto init_pins_fail_2;
+		gpio_free(TOGGLE_PIN);
+		return -1;
 	}
-
-	hrtimer_init(&hrt.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hrt.timer.function = hrt_timer_callback;
 
 	return 0;
 
@@ -183,8 +182,6 @@ static int __init hrt_init(void)
 {
 	sema_init(&hrt.sem, 1);
 	
-	hrt.usecs = DEFAULT_INTERVAL_US;
-
 	if (hrt_init_cdev())
 		goto init_fail_1;
 
@@ -193,6 +190,9 @@ static int __init hrt_init(void)
 
 	if (hrt_init_pins() < 0)
 		goto init_fail_3;
+
+	hrtimer_init(&hrt.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrt.timer.function = hrt_timer_callback;
 
 	return 0;
 
@@ -212,6 +212,8 @@ module_init(hrt_init);
 
 static void __exit hrt_exit(void)
 {
+	hrtimer_cancel(&hrt.timer);
+
 	gpio_free(TOGGLE_PIN);
 
 	device_destroy(hrt.class, hrt.devt);
