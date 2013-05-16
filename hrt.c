@@ -168,14 +168,6 @@ static int __init hrt_init_pins(void)
 	}
 
 	return 0;
-
-
-init_pins_fail_2:
-	gpio_free(TOGGLE_PIN);
-
-init_pins_fail_1:
-
-	return -1;
 }
 
 static int __init hrt_init(void)
