@@ -11,6 +11,7 @@ default:
 ifeq ($(strip $(KERNELDIR)),)
 	$(error "KERNELDIR is undefined!")
 else
+	$(MAKE) -C $(KERNELDIR) scripts
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules 
 endif
 
