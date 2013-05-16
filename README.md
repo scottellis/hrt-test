@@ -17,11 +17,12 @@ Build
 -------
 
 There is a file you can source to set up the environment for building using
-the OE tools configured the standard gumstix way.
+the Yocto built tools configured.
 
     $ git clone git://github.com/scottellis/hrt-test.git
     $ cd hrt-test
-    $ source overo-source-me.txt
+    $ export OETMP=<TMPDIR-from-your-local.conf>
+    $ source yocto-env.sh
     $ make
  
 
